@@ -105,6 +105,7 @@
     <Compile Include="Auditing\AuditingHelper.cs" />
     <Compile Include="Auditing\IMvcControllersAuditingConfiguration.cs" />
     <Compile Include="Auditing\MvcControllersAuditingConfiguration.cs" />
+    <Compile Include="Json\JsonHelper.cs" />
     <Compile Include="NameValue.cs" />
     <Compile Include="Application\Services\Dto\NameValueDto.cs" />
     <Compile Include="Application\Services\Dto\NullableIdInput.cs" />
@@ -419,6 +420,9 @@
   <ItemGroup>
     <EmbeddedResource Include="Localization\Sources\AbpXmlSource\Abp-tr.xml" />
     <EmbeddedResource Include="Localization\Sources\AbpXmlSource\Abp.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Localization\Sources\AbpXmlSource\Abp-zh-CN.xml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
