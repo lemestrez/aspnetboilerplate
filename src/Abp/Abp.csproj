@@ -47,18 +47,21 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\Castle.Windsor.3.3.0\lib\net45\Castle.Windsor.dll</HintPath>
     </Reference>
-    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+    <Reference Include="Newtonsoft.Json, Version=7.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="Nito.AsyncEx">
-      <HintPath>..\packages\Nito.AsyncEx.3.0.0\lib\net45\Nito.AsyncEx.dll</HintPath>
+    <Reference Include="Nito.AsyncEx, Version=3.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Nito.AsyncEx.3.0.1\lib\net45\Nito.AsyncEx.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="Nito.AsyncEx.Concurrent">
-      <HintPath>..\packages\Nito.AsyncEx.3.0.0\lib\net45\Nito.AsyncEx.Concurrent.dll</HintPath>
+    <Reference Include="Nito.AsyncEx.Concurrent, Version=3.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Nito.AsyncEx.3.0.1\lib\net45\Nito.AsyncEx.Concurrent.dll</HintPath>
+      <Private>True</Private>
     </Reference>
-    <Reference Include="Nito.AsyncEx.Enlightenment">
-      <HintPath>..\packages\Nito.AsyncEx.3.0.0\lib\net45\Nito.AsyncEx.Enlightenment.dll</HintPath>
+    <Reference Include="Nito.AsyncEx.Enlightenment, Version=3.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Nito.AsyncEx.3.0.1\lib\net45\Nito.AsyncEx.Enlightenment.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Collections.Immutable, Version=1.0.34.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -66,6 +69,7 @@
       <HintPath>..\packages\Microsoft.Bcl.Immutable.1.0.34\lib\portable-net45+win8+wp8+wpa81\System.Collections.Immutable.dll</HintPath>
     </Reference>
     <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System.Configuration" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
@@ -105,6 +109,11 @@
     <Compile Include="Auditing\AuditingHelper.cs" />
     <Compile Include="Auditing\IMvcControllersAuditingConfiguration.cs" />
     <Compile Include="Auditing\MvcControllersAuditingConfiguration.cs" />
+    <Compile Include="Configuration\CacheManagerSettingExtensions.cs" />
+    <Compile Include="Runtime\Caching\Configuration\CacheConfigurator.cs" />
+    <Compile Include="Runtime\Caching\Configuration\CachingConfiguration.cs" />
+    <Compile Include="Runtime\Caching\Configuration\ICacheConfigurator.cs" />
+    <Compile Include="Runtime\Caching\Configuration\ICachingConfiguration.cs" />
     <Compile Include="Json\JsonHelper.cs" />
     <Compile Include="NameValue.cs" />
     <Compile Include="Application\Services\Dto\NameValueDto.cs" />
@@ -127,6 +136,18 @@
     <Compile Include="Auditing\IAuditingStore.cs" />
     <Compile Include="Auditing\NullAuditInfoProvider.cs" />
     <Compile Include="Auditing\SimpleLogAuditingStore.cs" />
+    <Compile Include="Reflection\TypeHelper.cs" />
+    <Compile Include="Runtime\Caching\CacheExtensions.cs" />
+    <Compile Include="Runtime\Caching\CacheManagerBase.cs" />
+    <Compile Include="Runtime\Caching\CacheBase.cs" />
+    <Compile Include="Runtime\Caching\ICacheManager.cs" />
+    <Compile Include="Runtime\Caching\ICache.cs" />
+    <Compile Include="Runtime\Caching\ITypedCache.cs" />
+    <Compile Include="Runtime\Caching\Memory\AbpMemoryCache.cs" />
+    <Compile Include="Runtime\Caching\Memory\AbpMemoryCacheManager.cs" />
+    <Compile Include="Runtime\Caching\TypedCacheWrapper.cs" />
+    <Compile Include="Runtime\Validation\DisableValidationAttribute.cs" />
+    <Compile Include="Runtime\Validation\Interception\ValidationInterceptorRegistrar.cs" />
     <Compile Include="Text\Formatting\FormatStringToken.cs" />
     <Compile Include="Text\Formatting\FormatStringTokenType.cs" />
     <Compile Include="Text\Formatting\FormatStringTokenizer.cs" />
@@ -245,7 +266,7 @@
     <Compile Include="Net\Mail\Smtp\SmtpEmailSenderConfiguration.cs" />
     <Compile Include="Net\Mail\IEmailSender.cs" />
     <Compile Include="RandomHelper.cs" />
-    <Compile Include="Runtime\Caching\AsyncThreadSafeObjectCache.cs" />
+    <Compile Include="Runtime\Caching\Memory\AsyncThreadSafeObjectCache.cs" />
     <Compile Include="Runtime\Session\AbpSessionExtensions.cs" />
     <Compile Include="Threading\InternalAsyncHelper.cs" />
     <Compile Include="Extensions\DateTimeRangeExtensions.cs" />
@@ -296,7 +317,7 @@
     <Compile Include="Configuration\SettingProvider.cs" />
     <Compile Include="Configuration\ISettingManager.cs" />
     <Compile Include="Configuration\ISettingStore.cs" />
-    <Compile Include="Configuration\NullSettingStore.cs" />
+    <Compile Include="Configuration\DefaultConfigSettingStore.cs" />
     <Compile Include="Configuration\SettingDefinition.cs" />
     <Compile Include="Configuration\SettingDefinitionGroup.cs" />
     <Compile Include="Configuration\SettingHelper.cs" />
@@ -324,7 +345,7 @@
     <Compile Include="Localization\LocalizableString.cs" />
     <Compile Include="Logging\LogHelper.cs" />
     <Compile Include="AbpKernelModule.cs" />
-    <Compile Include="Runtime\Caching\ThreadSafeObjectCache.cs" />
+    <Compile Include="Runtime\Caching\Memory\ThreadSafeObjectCache.cs" />
     <Compile Include="Dependency\ConventionalRegistrationConfig.cs" />
     <Compile Include="Dependency\DisposableDependencyObjectWrapperOfT.cs" />
     <Compile Include="Dependency\ITransientDependency.cs" />

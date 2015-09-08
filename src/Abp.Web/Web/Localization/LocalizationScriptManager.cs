@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading;
 using Abp.Dependency;
 using Abp.Localization;
-using Abp.Runtime.Caching;
+using Abp.Runtime.Caching.Memory;
 
 namespace Abp.Web.Localization
 {
@@ -102,9 +102,9 @@ namespace Abp.Web.Localization
                             "        '{0}' : '{1}'" + (i < stringValues.Count - 1 ? "," : ""),
                                 stringValues[i].Name,
                                 stringValues[i].Value
+                                    .Replace(@"\", @"\\")
                                     .Replace("'", @"\'")
                                     .Replace(Environment.NewLine, string.Empty)
-                                    .Replace(@"\", @"\\")
                                 ));
                 }
 
