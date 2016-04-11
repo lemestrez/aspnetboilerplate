@@ -1,20 +1,28 @@
 ﻿using System;
 using System.Reflection;
+using Abp.Application.Features;
 using Abp.Application.Navigation;
 using Abp.Application.Services;
 using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Authorization.Interceptors;
+using Abp.BackgroundJobs;
 using Abp.Configuration;
 using Abp.Dependency;
 using Abp.Domain.Uow;
 using Abp.Events.Bus;
 using Abp.Localization;
-using Abp.Localization.Sources;
-using Abp.Localization.Sources.Xml;
+using Abp.Localization.Dictionaries;
+using Abp.Localization.Dictionaries.Xml;
 using Abp.Modules;
+using Abp.MultiTenancy;
 using Abp.Net.Mail;
+using Abp.Notifications;
+using Abp.Runtime.Caching;
+using Abp.Runtime.Session;
 using Abp.Runtime.Validation.Interception;
+using Abp.Threading;
+using Abp.Threading.BackgroundWorkers;
 
 namespace Abp
 {
@@ -24,16 +32,14 @@ namespace Abp
     /// </summary>
     public sealed class AbpKernelModule : AbpModule
     {
-        private AuditingInterceptorRegistrar _auditingInterceptorRegistrar;
-
         public override void PreInitialize()
         {
             IocManager.AddConventionalRegistrar(new BasicConventionalRegistrar());
 
             ValidationInterceptorRegistrar.Initialize(IocManager);
 
-            _auditingInterceptorRegistrar = new AuditingInterceptorRegistrar(IocManager);
-            _auditingInterceptorRegistrar.Initialize();
+            FeatureInterceptorRegistrar.Initialize(IocManager);
+            AuditingInterceptorRegistrar.Initialize(IocManager);
 
             UnitOfWorkRegistrar.Initialize(IocManager);
 
@@ -53,7 +59,9 @@ namespace Abp
                         Assembly.GetExecutingAssembly(), "Abp.Localization.Sources.AbpXmlSource"
                         )));
 
+            Configuration.Settings.Providers.Add<LocalizationSettingProvider>();
             Configuration.Settings.Providers.Add<EmailSettingProvider>();
+            Configuration.Settings.Providers.Add<NotificationSettingProvider>();
 
             Configuration.UnitOfWork.RegisterFilter(AbpDataFilters.SoftDelete, true);
             Configuration.UnitOfWork.RegisterFilter(AbpDataFilters.MustHaveTenant, true);
@@ -79,25 +87,42 @@ namespace Abp
         {
             RegisterMissingComponents();
 
-            IocManager.Resolve<LocalizationManager>().Initialize();
-            IocManager.Resolve<NavigationManager>().Initialize();
-            IocManager.Resolve<PermissionManager>().Initialize();
             IocManager.Resolve<SettingDefinitionManager>().Initialize();
+            IocManager.Resolve<FeatureManager>().Initialize();
+            IocManager.Resolve<PermissionManager>().Initialize();
+            IocManager.Resolve<LocalizationManager>().Initialize();
+            IocManager.Resolve<NotificationDefinitionManager>().Initialize();
+            IocManager.Resolve<NavigationManager>().Initialize();
+
+            if (Configuration.BackgroundJobs.IsJobExecutionEnabled)
+            {
+                var workerManager = IocManager.Resolve<IBackgroundWorkerManager>();
+                workerManager.Start();
+                workerManager.Add(IocManager.Resolve<IBackgroundJobManager>());
+            }
+        }
+
+        public override void Shutdown()
+        {
+            if (Configuration.BackgroundJobs.IsJobExecutionEnabled)
+            {
+                IocManager.Resolve<IBackgroundWorkerManager>().StopAndWaitToStop();
+            }
         }
 
         private void ConfigureCaches()
         {
-            Configuration.Caching.Configure(SettingManager.ApplicationSettingsCacheName, cache =>
+            Configuration.Caching.Configure(AbpCacheNames.ApplicationSettings, cache =>
             {
                 cache.DefaultSlidingExpireTime = TimeSpan.FromHours(8);
             });
 
-            Configuration.Caching.Configure(SettingManager.TenantSettingsCacheName, cache =>
+            Configuration.Caching.Configure(AbpCacheNames.TenantSettings, cache =>
             {
                 cache.DefaultSlidingExpireTime = TimeSpan.FromMinutes(60);
             });
 
-            Configuration.Caching.Configure(SettingManager.ApplicationSettingsCacheName, cache =>
+            Configuration.Caching.Configure(AbpCacheNames.UserSettings, cache =>
             {
                 cache.DefaultSlidingExpireTime = TimeSpan.FromMinutes(20);
             });
@@ -105,9 +130,25 @@ namespace Abp
 
         private void RegisterMissingComponents()
         {
+            IocManager.RegisterIfNot<IGuidGenerator, SequentialGuidGenerator>(DependencyLifeStyle.Transient);
             IocManager.RegisterIfNot<IUnitOfWork, NullUnitOfWork>(DependencyLifeStyle.Transient);
-            IocManager.RegisterIfNot<IAuditInfoProvider, NullAuditInfoProvider>(DependencyLifeStyle.Transient);
+            IocManager.RegisterIfNot<IAuditInfoProvider, NullAuditInfoProvider>(DependencyLifeStyle.Singleton);
             IocManager.RegisterIfNot<IAuditingStore, SimpleLogAuditingStore>(DependencyLifeStyle.Transient);
+            IocManager.RegisterIfNot<ITenantIdResolver, NullTenantIdResolver>(DependencyLifeStyle.Singleton);
+            IocManager.RegisterIfNot<IAbpSession, ClaimsAbpSession>(DependencyLifeStyle.Singleton);
+            IocManager.RegisterIfNot<IRealTimeNotifier, NullRealTimeNotifier>(DependencyLifeStyle.Singleton);
+            IocManager.RegisterIfNot<INotificationStore, NullNotificationStore>(DependencyLifeStyle.Singleton);
+
+            IocManager.RegisterIfNot<IBackgroundJobManager, BackgroundJobManager>(DependencyLifeStyle.Singleton);
+
+            if (Configuration.BackgroundJobs.IsJobExecutionEnabled)
+            {
+                IocManager.RegisterIfNot<IBackgroundJobStore, InMemoryBackgroundJobStore>(DependencyLifeStyle.Singleton);
+            }
+            else
+            {
+                IocManager.RegisterIfNot<IBackgroundJobStore, NullBackgroundJobStore>(DependencyLifeStyle.Singleton);
+            }
         }
     }
 }

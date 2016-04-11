@@ -1,4 +1,5 @@
-﻿using System.Data.Common;
+﻿using System;
+using System.Data.Common;
 using System.Data.Entity;
 using System.Data.Entity.Core.Objects;
 using System.Data.Entity.Infrastructure;
@@ -32,7 +33,7 @@ namespace Abp.EntityFramework
         /// <summary>
         /// Used to trigger entity change events.
         /// </summary>
-        public IEntityChangedEventHelper EntityChangedEventHelper { get; set; }
+        public IEntityChangeEventHelper EntityChangeEventHelper { get; set; }
 
         /// <summary>
         /// Reference to the logger.
@@ -40,14 +41,17 @@ namespace Abp.EntityFramework
         public ILogger Logger { get; set; }
 
         /// <summary>
+        /// Reference to GUID generator.
+        /// </summary>
+        public IGuidGenerator GuidGenerator { get; set; }
+
+        /// <summary>
         /// Constructor.
         /// Uses <see cref="IAbpStartupConfiguration.DefaultNameOrConnectionString"/> as connection string.
         /// </summary>
         protected AbpDbContext()
         {
-            Logger = NullLogger.Instance;
-            AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            SetNullsForInjectedProperties();
         }
 
         /// <summary>
@@ -56,9 +60,7 @@ namespace Abp.EntityFramework
         protected AbpDbContext(string nameOrConnectionString)
             : base(nameOrConnectionString)
         {
-            Logger = NullLogger.Instance;
-            AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            SetNullsForInjectedProperties();
         }
 
         /// <summary>
@@ -67,9 +69,7 @@ namespace Abp.EntityFramework
         protected AbpDbContext(DbCompiledModel model)
             : base(model)
         {
-            Logger = NullLogger.Instance;
-            AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            SetNullsForInjectedProperties();
         }
 
         /// <summary>
@@ -78,9 +78,7 @@ namespace Abp.EntityFramework
         protected AbpDbContext(DbConnection existingConnection, bool contextOwnsConnection)
             : base(existingConnection, contextOwnsConnection)
         {
-            Logger = NullLogger.Instance;
-            AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            SetNullsForInjectedProperties();
         }
 
         /// <summary>
@@ -89,9 +87,7 @@ namespace Abp.EntityFramework
         protected AbpDbContext(string nameOrConnectionString, DbCompiledModel model)
             : base(nameOrConnectionString, model)
         {
-            Logger = NullLogger.Instance;
-            AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            SetNullsForInjectedProperties();
         }
 
         /// <summary>
@@ -100,9 +96,7 @@ namespace Abp.EntityFramework
         protected AbpDbContext(ObjectContext objectContext, bool dbContextOwnsObjectContext)
             : base(objectContext, dbContextOwnsObjectContext)
         {
-            Logger = NullLogger.Instance;
-            AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            SetNullsForInjectedProperties();
         }
 
         /// <summary>
@@ -111,9 +105,15 @@ namespace Abp.EntityFramework
         protected AbpDbContext(DbConnection existingConnection, DbCompiledModel model, bool contextOwnsConnection)
             : base(existingConnection, model, contextOwnsConnection)
         {
+            SetNullsForInjectedProperties();
+        }
+
+        private void SetNullsForInjectedProperties()
+        {
             Logger = NullLogger.Instance;
             AbpSession = NullAbpSession.Instance;
-            EntityChangedEventHelper = NullEntityChangedEventHelper.Instance;
+            EntityChangeEventHelper = NullEntityChangeEventHelper.Instance;
+            GuidGenerator = SequentialGuidGenerator.Instance;
         }
 
         public virtual void Initialize()
@@ -166,9 +166,11 @@ namespace Abp.EntityFramework
                 switch (entry.State)
                 {
                     case EntityState.Added:
+                        CheckAndSetId(entry);
                         SetCreationAuditProperties(entry);
                         CheckAndSetTenantIdProperty(entry);
-                        EntityChangedEventHelper.TriggerEntityCreatedEvent(entry.Entity);
+                        EntityChangeEventHelper.TriggerEntityCreatingEvent(entry.Entity);
+                        EntityChangeEventHelper.TriggerEntityCreatedEventOnUowCompleted(entry.Entity);
                         break;
                     case EntityState.Modified:
                         PreventSettingCreationAuditProperties(entry);
@@ -177,24 +179,36 @@ namespace Abp.EntityFramework
 
                         if (entry.Entity is ISoftDelete && entry.Entity.As<ISoftDelete>().IsDeleted)
                         {
-                            if (entry.Entity is IDeletionAudited)
-                            {
-                                SetDeletionAuditProperties(entry.Entity.As<IDeletionAudited>());
-                            }
+                            SetDeletionAuditProperties(entry);
 
-                            EntityChangedEventHelper.TriggerEntityDeletedEvent(entry.Entity);
+                            EntityChangeEventHelper.TriggerEntityDeletingEvent(entry.Entity);
+                            EntityChangeEventHelper.TriggerEntityDeletedEventOnUowCompleted(entry.Entity);
                         }
                         else
                         {
-                            EntityChangedEventHelper.TriggerEntityUpdatedEvent(entry.Entity);
+                            EntityChangeEventHelper.TriggerEntityUpdatingEvent(entry.Entity);
+                            EntityChangeEventHelper.TriggerEntityUpdatedEventOnUowCompleted(entry.Entity);
                         }
 
                         break;
                     case EntityState.Deleted:
                         PreventSettingCreationAuditProperties(entry);
                         HandleSoftDelete(entry);
-                        EntityChangedEventHelper.TriggerEntityDeletedEvent(entry.Entity);
+                        EntityChangeEventHelper.TriggerEntityDeletingEvent(entry.Entity);
+                        EntityChangeEventHelper.TriggerEntityDeletedEventOnUowCompleted(entry.Entity);
                         break;
+                }
+            }
+        }
+
+        protected virtual void CheckAndSetId(DbEntityEntry entry)
+        {
+            if (entry.Entity is IEntity<Guid>)
+            {
+                var entity = entry.Entity as IEntity<Guid>;
+                if (entity.IsTransient())
+                {
+                    entity.Id = GuidGenerator.Create();
                 }
             }
         }
@@ -266,7 +280,7 @@ namespace Abp.EntityFramework
                 entry.Cast<IHasCreationTime>().Entity.CreationTime = Clock.Now;
             }
 
-            if (entry.Entity is ICreationAudited)
+            if (entry.Entity is ICreationAudited && AbpSession.UserId.HasValue)
             {
                 entry.Cast<ICreationAudited>().Entity.CreatorUserId = AbpSession.UserId;
             }
@@ -288,12 +302,14 @@ namespace Abp.EntityFramework
 
         protected virtual void SetModificationAuditProperties(DbEntityEntry entry)
         {
-            if (entry.Entity is IModificationAudited)
+            if (entry.Entity is IHasModificationTime)
             {
-                var auditedEntry = entry.Cast<IModificationAudited>();
+                entry.Cast<IHasModificationTime>().Entity.LastModificationTime = Clock.Now;
+            }
 
-                auditedEntry.Entity.LastModificationTime = Clock.Now;
-                auditedEntry.Entity.LastModifierUserId = AbpSession.UserId;
+            if (entry.Entity is IModificationAudited && AbpSession.UserId.HasValue)
+            {
+                entry.Cast<IModificationAudited>().Entity.LastModifierUserId = AbpSession.UserId;
             }
         }
 
@@ -309,16 +325,20 @@ namespace Abp.EntityFramework
             softDeleteEntry.State = EntityState.Unchanged;
             softDeleteEntry.Entity.IsDeleted = true;
 
-            if (entry.Entity is IDeletionAudited)
-            {
-                SetDeletionAuditProperties(entry.Cast<IDeletionAudited>().Entity);
-            }
+            SetDeletionAuditProperties(entry);
         }
 
-        protected virtual void SetDeletionAuditProperties(IDeletionAudited entity)
+        protected virtual void SetDeletionAuditProperties(DbEntityEntry entry)
         {
-            entity.DeletionTime = Clock.Now;
-            entity.DeleterUserId = AbpSession.UserId;
+            if (entry.Entity is IHasDeletionTime)
+            {
+                entry.Cast<IHasDeletionTime>().Entity.DeletionTime = Clock.Now;
+            }
+
+            if (entry.Entity is IDeletionAudited && AbpSession.UserId.HasValue)
+            {
+                entry.Cast<IDeletionAudited>().Entity.DeleterUserId = AbpSession.UserId;
+            }
         }
 
         private void LogDbEntityValidationException(DbEntityValidationException exception)

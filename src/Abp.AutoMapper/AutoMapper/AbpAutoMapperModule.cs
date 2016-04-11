@@ -7,11 +7,10 @@ using Castle.Core.Logging;
 
 namespace Abp.AutoMapper
 {
+    [DependsOn(typeof (AbpKernelModule))]
     public class AbpAutoMapperModule : AbpModule
     {
         public ILogger Logger { get; set; }
-
-        public ILocalizationManager LocalizationManager { get; set; }
 
         private readonly ITypeFinder _typeFinder;
 
@@ -22,7 +21,6 @@ namespace Abp.AutoMapper
         {
             _typeFinder = typeFinder;
             Logger = NullLogger.Instance;
-            LocalizationManager = NullLocalizationManager.Instance;
         }
 
         public override void PostInitialize()
@@ -40,18 +38,14 @@ namespace Abp.AutoMapper
                     return;
                 }
 
-                AutoMapperHelper.Initialize(configuration =>
-                {
-
-                    FindAndAutoMapTypes(configuration);
-                    CreateOtherMappings(configuration);
-                });
+                FindAndAutoMapTypes();
+                CreateOtherMappings();
 
                 _createdMappingsBefore = true;
             }
         }
 
-        private void FindAndAutoMapTypes(IConfiguration configuration)
+        private void FindAndAutoMapTypes()
         {
             var types = _typeFinder.Find(type =>
                 type.IsDefined(typeof(AutoMapAttribute)) ||
@@ -63,13 +57,14 @@ namespace Abp.AutoMapper
             foreach (var type in types)
             {
                 Logger.Debug(type.FullName);
-                AutoMapperHelper.CreateMap(configuration, type);
+                AutoMapperHelper.CreateMap(type);
             }
         }
 
-        private void CreateOtherMappings(IConfiguration configuration)
+        private void CreateOtherMappings()
         {
-            configuration.CreateMap<LocalizableString, string>().ConvertUsing(ls => LocalizationManager.GetString(ls.SourceName, ls.Name));
+            var localizationManager = IocManager.Resolve<ILocalizationManager>();
+            Mapper.CreateMap<LocalizableString, string>().ConvertUsing(ls => localizationManager.GetString(ls));
         }
     }
 }

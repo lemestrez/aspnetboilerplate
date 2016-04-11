@@ -143,6 +143,16 @@ namespace Abp.WebApi.Controllers.Dynamic.Builders
                 return HttpVerb.Delete;
             }
 
+            if (_methodInfo.IsDefined(typeof(HttpOptionsAttribute)))
+            {
+                return HttpVerb.Options;
+            }
+
+            if (_methodInfo.IsDefined(typeof(HttpHeadAttribute)))
+            {
+                return HttpVerb.Head;
+            }
+
             if (conventionalVerbs)
             {
                 var conventionalVerb = DynamicApiVerbHelper.GetConventionalVerbForMethodName(ActionName);
@@ -159,7 +169,7 @@ namespace Abp.WebApi.Controllers.Dynamic.Builders
 
         private static bool HasOnlyPrimitiveIncludingNullableTypeParameters(MethodInfo methodInfo)
         {
-            return methodInfo.GetParameters().All(p => TypeHelper.IsPrimitiveIncludingNullable(p.ParameterType) || p.IsDefined(typeof (FromUriAttribute)));
+            return methodInfo.GetParameters().All(p => TypeHelper.IsPrimitiveExtendedIncludingNullable(p.ParameterType) || p.IsDefined(typeof (FromUriAttribute)));
         }
     }
 }
