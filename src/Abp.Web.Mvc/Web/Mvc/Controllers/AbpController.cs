@@ -26,8 +26,6 @@ using Abp.Web.Models;
 using Abp.Web.Mvc.Controllers.Results;
 using Abp.Web.Mvc.Models;
 using Castle.Core.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Serialization;
 
 namespace Abp.Web.Mvc.Controllers
 {
@@ -162,7 +160,19 @@ namespace Abp.Web.Mvc.Controllers
         /// </summary>
         private WrapResultAttribute _wrapResultAttribute;
 
-        private static Type[] _ignoredTypesForSerialization = { typeof(HttpPostedFileBase) };
+        /// <summary>
+        /// Ignored types for serialization on audit logging.
+        /// </summary>
+        protected static List<Type> IgnoredTypesForSerializationOnAuditLogging { get; private set; }
+
+        static AbpController()
+        {
+            IgnoredTypesForSerializationOnAuditLogging = new List<Type>
+            {
+                typeof (HttpPostedFileBase),
+                typeof (IEnumerable<HttpPostedFileBase>)
+            };
+        }
 
         /// <summary>
         /// Constructor.
@@ -499,7 +509,7 @@ namespace Abp.Web.Mvc.Controllers
 
                 foreach (var argument in arguments)
                 {
-                    if (argument.Value != null && _ignoredTypesForSerialization.Any(t => t.IsInstanceOfType(argument.Value)))
+                    if (argument.Value != null && IgnoredTypesForSerializationOnAuditLogging.Any(t => t.IsInstanceOfType(argument.Value)))
                     {
                         dictionary[argument.Key] = null;
                     }
@@ -509,12 +519,7 @@ namespace Abp.Web.Mvc.Controllers
                     }
                 }
 
-                return JsonConvert.SerializeObject(
-                    dictionary,
-                    new JsonSerializerSettings
-                    {
-                        ContractResolver = new CamelCasePropertyNamesContractResolver()
-                    });
+                return AuditingHelper.Serialize(dictionary);
             }
             catch (Exception ex)
             {
