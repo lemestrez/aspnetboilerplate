@@ -1,14 +1,24 @@
 ﻿using System;
 using Abp.AspNetCore;
-using Abp.Dependency;
+using Abp.AspNetCore.Mvc.Auditing;
+using Abp.AspNetCore.Mvc.Authorization;
+using Abp.AspNetCore.Mvc.ExceptionHandling;
+using Abp.AspNetCore.Mvc.Results;
+using Abp.AspNetCore.Mvc.Validation;
+using AbpAspNetCoreDemo.EntityFrameworkCore;
 using Castle.Facilities.Logging;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc.Formatters;
 using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
+using Microsoft.EntityFrameworkCore;
 
 namespace AbpAspNetCoreDemo
 {
@@ -39,12 +49,30 @@ namespace AbpAspNetCoreDemo
         public override IServiceProvider ConfigureServices(IServiceCollection services)
         {
             //See https://github.com/aspnet/Mvc/issues/3936 to know why we added these services.
-            services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            services.AddSingleton<IActionContextAccessor, ActionContextAccessor>();
+            services.TryAddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            services.TryAddSingleton<IActionContextAccessor, ActionContextAccessor>();
+
+            services.AddDbContext<MyDbContext>(
+                options => options.UseSqlServer(Configuration.GetConnectionString("Default"))
+            );
 
             // Add framework services.
-            services.AddMvc();
-             
+            services.AddMvc(options =>
+            {
+                options.Filters.AddService(typeof(AbpAuthorizationFilter));
+                options.Filters.AddService(typeof(AbpAuditActionFilter));
+                options.Filters.AddService(typeof(AbpValidationActionFilter));
+                options.Filters.AddService(typeof(AbpExceptionFilter));
+                options.Filters.AddService(typeof(AbpResultFilter));
+
+                options.OutputFormatters.Add(new JsonOutputFormatter(
+                    new JsonSerializerSettings
+                    {
+                        ContractResolver = new CamelCasePropertyNamesContractResolver()
+                    }));
+
+            }).AddControllersAsServices();
+
             return base.ConfigureServices(services);
         }
 
@@ -56,7 +84,20 @@ namespace AbpAspNetCoreDemo
             loggerFactory.AddConsole(Configuration.GetSection("Logging"));
             loggerFactory.AddDebug();
 
-            app.UseMvc();
+            if (env.IsDevelopment())
+            {
+                app.UseDeveloperExceptionPage();
+                app.UseDatabaseErrorPage();
+            }
+
+            app.UseStaticFiles();
+
+            app.UseMvc(routes =>
+            {
+                routes.MapRoute(
+                    name: "default",
+                    template: "{controller=Home}/{action=Index}/{id?}");
+            });
         }
     }
 }

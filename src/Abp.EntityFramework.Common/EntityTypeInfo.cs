@@ -1,5 +1,4 @@
 using System;
-using System.Data.Entity;
 
 namespace Abp.EntityFramework
 {
@@ -11,7 +10,7 @@ namespace Abp.EntityFramework
         public Type EntityType { get; private set; }
 
         /// <summary>
-        /// DbContext type that has <see cref="DbSet{TEntity}"/> property.
+        /// DbContext type that has DbSet property.
         /// </summary>
         public Type DeclaringType { get; private set; }
 
